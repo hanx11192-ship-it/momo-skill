@@ -60,6 +60,13 @@ python scripts/momo.py list button              # 列出释义/例句/助记
 python scripts/momo.py list button --type note  # 只看助记
 ```
 
+**超上限时的询问/替换流程（释义/例句/助记/图例通用）**
+
+创建返回 `xxx_create_limitation`（超出数量上限）时，脚本会列出该词已有的条目
+（含 id / tags / 内容预览）并以**退出码 3** 结束。此时应把列表展示给用户并询问
+「替换其中一条，还是放弃」；用户选定后重跑同一命令加 `--replace <id>`（先删旧再建新）。
+禁止在没有用户确认的情况下擅自删除已有内容。
+
 **写入释义**
 
 ```bash

@@ -119,7 +119,7 @@ def load_tokens():
 
 def _auto_renew(script, hint):
     """token 缺失/过期时自动重取（需 cof.json 已配置账号）。AI/用户均无需手动操作。"""
-    path = os.path.join(HERE, script)
+    path = os.path.join(_HERE, script)
     if not os.path.exists(path):
         die(f"找不到 {path}，{hint}")
     print(f"[i] 凭证缺失/过期，自动运行 {script} 续期…", file=sys.stderr)
@@ -311,11 +311,64 @@ def put_priv_voc(word, hexid):
     print(f"   缓存文件：{PRIV_VOC_CACHE}")
 
 
+
+# ────────────────────────── 超限询问/替换 ──────────────────────────
+
+def _fetch_items(voc, path, key):
+    st, j = open_api("GET", path, query={"voc_id": voc})
+    if st == 200 and isinstance(j, dict):
+        return j.get("data", {}).get(key, []) or []
+    return []
+
+
+def _preview(kind, it):
+    if kind == "释义":
+        return f"tags={it.get('tags')}  {it.get('interpretation')!r}"
+    if kind == "例句":
+        return f"tags={it.get('tags')} origin={it.get('origin')!r}  {it.get('phrase')!r} / {it.get('interpretation')!r}"
+    txt = it.get("note") or ""
+    if it.get("note_type") == "图例":
+        txt = "[图片]" if not txt else txt
+    return f"type={it.get('note_type')!r}  {txt!r}"
+
+
+def _ask_on_limit(kind, voc, path, key):
+    """达到数量上限：列出已有条目并以退出码 3 结束，让 AI/用户决定替换哪条。"""
+    items = _fetch_items(voc, path, key)
+    print(f"\n❓ {kind}已达到该词的数量上限。当前已有 {len(items)} 条：", file=sys.stderr)
+    for i, it in enumerate(items, 1):
+        print(f"  [{i}] id={it.get('id')}  {_preview(kind, it)}", file=sys.stderr)
+    print("\n→ 请把这些条目展示给用户并询问：替换其中一条，还是放弃写入。", file=sys.stderr)
+    print("→ 用户决定后重跑同一命令并加  --replace <上面列出的id>  （会先删旧再建新）。", file=sys.stderr)
+    print("→ 若用户选择放弃，无需任何操作。", file=sys.stderr)
+    sys.exit(3)
+
+
+def _replace_old(kind, replace_id, path, key, items=None, voc=None):
+    """按 --replace 指定的 id 删除旧条目。"""
+    if kind == "释义":
+        st, j = open_api("DELETE", f"/interpretations/{replace_id}")
+    elif kind == "例句":
+        st, j = open_api("DELETE", f"/phrases/{replace_id}")
+    else:  # 助记（含图例）：软删，note_type 用远端的实际值
+        items = items if items is not None else _fetch_items(voc, path, key)
+        nt = next((x.get("note_type") for x in items if x.get("id") == replace_id), "其他")
+        txt = next((x.get("note") or "" for x in items if x.get("id") == replace_id), "")
+        st, j = open_api("POST", f"/notes/{replace_id}",
+                         {"note": {"note": txt, "note_type": nt, "status": "DELETED"}})
+    if st in (200, 201):
+        ok(f"已删除旧{kind} {replace_id}")
+        return True
+    die(f"删除旧{kind} {replace_id} 失败 HTTP {st}：{json.dumps(j, ensure_ascii=False)[:300]}")
+
+
 # ────────────────────────── 释义 ──────────────────────────
 
-def interp_add(word, text, tags, private=False):
+def interp_add(word, text, tags, private=False, replace=None):
     cfg = load_config().get("interp", {})
     voc = get_voc_id(word)
+    if replace:
+        _replace_old("释义", replace, "/interpretations", "interpretations")
     tags = tags or cfg.get("tags") or ["简明"]
     bad = [t for t in tags if t not in TAGS_INTERP]
     if bad:
@@ -328,6 +381,8 @@ def interp_add(word, text, tags, private=False):
     if st in (200, 201):
         nid = j.get("data", {}).get("interpretation", {}).get("id")
         ok(f"释义已创建 HTTP {st}  id={nid}")
+    elif isinstance(j, dict) and any("limitation" in e.get("code", "") for e in j.get("errors", [])):
+        _ask_on_limit("释义", voc, "/interpretations", "interpretations")
     else:
         die(f"创建失败 HTTP {st}：{json.dumps(j, ensure_ascii=False)}")
 
@@ -342,9 +397,11 @@ def interp_del(iid):
 
 # ────────────────────────── 例句 ──────────────────────────
 
-def phrase_add(word, phrase, interp, tags, origin, private=False):
+def phrase_add(word, phrase, interp, tags, origin, private=False, replace=None):
     cfg = load_config().get("phrase", {})
     voc = get_voc_id(word)
+    if replace:
+        _replace_old("例句", replace, "/phrases", "phrases")
     tags = tags or cfg.get("tags") or ["小学"]
     bad = [t for t in tags if t not in TAGS_PHRASE]
     if bad:
@@ -360,6 +417,8 @@ def phrase_add(word, phrase, interp, tags, origin, private=False):
     if st in (200, 201):
         nid = j.get("data", {}).get("phrase", {}).get("id")
         ok(f"例句已创建 HTTP {st}  id={nid}")
+    elif isinstance(j, dict) and any("limitation" in e.get("code", "") for e in j.get("errors", [])):
+        _ask_on_limit("例句", voc, "/phrases", "phrases")
     else:
         die(f"创建失败 HTTP {st}：{json.dumps(j, ensure_ascii=False)}")
 
@@ -374,9 +433,13 @@ def phrase_del(pid):
 
 # ────────────────────────── 助记（文本） ──────────────────────────
 
-def note_add(word, note_type, text, publish=None):
+def note_add(word, note_type, text, publish=None, replace=None):
     cfg = load_config().get("note", {})
     voc = get_voc_id(word)
+    items = None
+    if replace:
+        items = _fetch_items(voc, "/notes", "notes")
+        _replace_old("助记", replace, "/notes", "notes", items, voc)
     note_type = note_type or cfg.get("type") or "其他"
     if publish is None:
         publish = cfg.get("public", False)   # 默认私有
@@ -387,8 +450,8 @@ def note_add(word, note_type, text, publish=None):
     if st in (200, 201):
         nid = j.get("data", {}).get("note", {}).get("id")
         ok(f"文本助记已创建 HTTP {st}  id={nid}")
-    elif isinstance(j, dict) and any(e.get("code") == "note_create_limitation" for e in j.get("errors", [])):
-        die("超出助记数量上限（文本类每词 2 条，图例 1 条）。改用释义/例句接口。")
+    elif isinstance(j, dict) and any("limitation" in e.get("code", "") for e in j.get("errors", [])):
+        _ask_on_limit("助记", voc, "/notes", "notes")
     else:
         die(f"创建失败 HTTP {st}：{json.dumps(j, ensure_ascii=False)}")
 
@@ -513,7 +576,11 @@ def try_resolve_priv_voc(word):
     return None
 
 
-def image_note(word, image_path, private_voc=None):
+def image_note(word, image_path, private_voc=None, replace=None):
+    voc = get_voc_id(word)
+    if replace:
+        items = _fetch_items(voc, "/notes", "notes")
+        _replace_old("助记", replace, "/notes", "notes", items, voc)
     # 0) 格式保障：webp/bmp/gif 等自动转 PNG（App 只接受 PNG/JPG）
     image_path = ensure_upload_format(image_path)
     # 1) 上传
@@ -608,6 +675,8 @@ def main():
                     help="可多选，如 --tags 简明 详细；默认取 config.json 的 interp.tags（简明）")
     sp.add_argument("--private", action="store_true",
                     help="创建为私有（UNPUBLISHED）；默认公开 PUBLISHED")
+    sp.add_argument("--replace", default=None, metavar="ID",
+                    help="超上限时替换指定 id 的旧释义（先删后建）；不传则列出已有条目并退出码 3 供询问用户")
 
     sp = sub.add_parser("interp-del", help="删除释义")
     sp.add_argument("--id", required=True)
@@ -622,6 +691,8 @@ def main():
                     help="来源标签；默认取 config.json 的 phrase.origin")
     sp.add_argument("--private", action="store_true",
                     help="创建为私有（UNPUBLISHED）；默认公开 PUBLISHED")
+    sp.add_argument("--replace", default=None, metavar="ID",
+                    help="超上限时替换指定 id 的旧例句（先删后建）；不传则列出已有条目并退出码 3 供询问用户")
 
     sp = sub.add_parser("phrase-del", help="删除例句")
     sp.add_argument("--id", required=True)
@@ -633,6 +704,8 @@ def main():
     sp.add_argument("--text", required=True)
     sp.add_argument("--publish", action="store_true",
                     help="创建为公开；默认私有（也可用 config.json 的 note.public）")
+    sp.add_argument("--replace", default=None, metavar="ID",
+                    help="超上限时替换指定 id 的旧助记（先删后建）；不传则列出已有条目并退出码 3 供询问用户")
 
     sp = sub.add_parser("note-del", help="删除助记")
     sp.add_argument("--id", required=True)
@@ -643,6 +716,8 @@ def main():
     sp.add_argument("--word", required=True)
     sp.add_argument("--image", required=True)
     sp.add_argument("--private-voc", default=None)
+    sp.add_argument("--replace", default=None, metavar="ID",
+                    help="该词已有图例时替换指定 id 的旧图例（先删后建）；不传则列出已有条目并退出码 3 供询问用户")
 
     sp = sub.add_parser("convert-image",
                         help="图片格式转换（webp/bmp/gif/tiff/avif → png/jpg）")
@@ -665,20 +740,20 @@ def main():
     elif args.cmd == "list":
         cmd_list(args.word, args.type)
     elif args.cmd == "interp-add":
-        interp_add(args.word, args.text, args.tags, args.private)
+        interp_add(args.word, args.text, args.tags, args.private, args.replace)
     elif args.cmd == "interp-del":
         interp_del(args.id)
     elif args.cmd == "phrase-add":
-        phrase_add(args.word, args.phrase, args.interp, args.tags, args.origin, args.private)
+        phrase_add(args.word, args.phrase, args.interp, args.tags, args.origin, args.private, args.replace)
     elif args.cmd == "phrase-del":
         phrase_del(args.id)
     elif args.cmd == "note-add":
         note_add(args.word, args.type, args.text,
-                 True if args.publish else None)
+                 True if args.publish else None, args.replace)
     elif args.cmd == "note-del":
         note_del(args.id, args.note_type, args.text)
     elif args.cmd == "image-note":
-        image_note(args.word, args.image, args.private_voc)
+        image_note(args.word, args.image, args.private_voc, args.replace)
     elif args.cmd == "convert-image":
         convert_image(args.src, args.out, args.fmt)
     elif args.cmd == "set-voc":
