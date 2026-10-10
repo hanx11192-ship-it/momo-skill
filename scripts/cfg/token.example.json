@@ -1,0 +1,12 @@
+{
+  "open_token": {
+    "open_token": "<你的 open_token，运行 open_token.py 自动写入>",
+    "expire": "", "expire_ts": 0,
+    "fetched_at": "", "fetched_ts": 0
+  },
+  "web_token": {
+    "web_token": "<你的 web_token，运行 web_token.py 自动写入>",
+    "expire": "", "expire_ts": 0,
+    "fetched_at": "", "fetched_ts": 0
+  }
+}
