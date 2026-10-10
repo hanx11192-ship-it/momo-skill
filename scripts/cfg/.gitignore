@@ -1,0 +1,6 @@
+cof.json
+token.json
+user_tag
+voc_private.json
+*.db-shm
+*.db-wal

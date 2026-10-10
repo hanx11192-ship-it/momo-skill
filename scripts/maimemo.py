@@ -67,7 +67,14 @@ def _user_tag():
     except Exception:
         return uuid.uuid4().hex
 
-USER_TAG = _user_tag()
+_user_tag_cache = None
+
+def USER_TAG():
+    """懒加载：首次调用才生成/读取，import 时不落盘。"""
+    global _user_tag_cache
+    if _user_tag_cache is None:
+        _user_tag_cache = _user_tag()
+    return _user_tag_cache
 UA = ("Maimemo/5.6.05_904 okhttp/4.9.2 Android/15 Channel/Vivo CustomOS/ColorOS (15.0.0.840) "
       "Device/Android+Phone (arm64)")
 
@@ -221,7 +228,7 @@ def priv_api(method, path, body=None, query=None, sign=True, want_sig=False):
     data = json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode("utf-8") if body is not None else None
     r = urllib.request.Request(url, data=data, method=method)
     r.add_header("User-Agent", UA)
-    r.add_header("x-user-tag", USER_TAG)
+    r.add_header("x-user-tag", USER_TAG())
     r.add_header("token", web_token())
     r.add_header("Accept-Encoding", "gzip")
     if data:
@@ -402,7 +409,7 @@ def upload_image(path, filename=None):
     data = b"".join(parts)
     r = urllib.request.Request(PRIV_HOST + "/api/v1/content/files", data=data, method="POST")
     r.add_header("User-Agent", UA)
-    r.add_header("x-user-tag", USER_TAG)
+    r.add_header("x-user-tag", USER_TAG())
     r.add_header("token", web_token())
     r.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
     r.add_header("Accept-Encoding", "gzip")
