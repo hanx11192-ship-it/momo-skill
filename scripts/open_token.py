@@ -268,9 +268,17 @@ def _parse_login_form(page, interaction_url):
 
 
 def _extract_error(html):
-    m = re.search(r'class="error-text"[^>]*>(.*?)</div>', html, re.S)
-    if m:
-        return "-> " + re.sub(r"<[^>]+>", "", m.group(1)).strip()
+    """登录失败页的错误提取。实测（2026-10-10）：失败响应是 HTTP 201，
+    错误文案在 id="login-error" 元素内；兼容旧版 class="error-text"。"""
+    for pat in (r'id="login-error"[^>]*>(.*?)</',
+                r'class="error-text"[^>]*>(.*?)</div>',
+                r'class="alert[^"]*"[^>]*>(.*?)</div>'):
+        m = re.search(pat, html, re.S)
+        if m:
+            txt = re.sub(r"<[^>]+>", " ", m.group(1)).strip()
+            txt = re.sub(r"\s+", " ", txt)
+            if txt:
+                return "-> " + txt
     return ""
 
 
