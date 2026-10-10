@@ -14,13 +14,13 @@
   python maimemo.py phrase-add --word button --phrase "Click the button." --interp "点击按钮。" \
                                [--tags 小学 四级 ...] [--origin "..."] [--private]
   python maimemo.py phrase-del --id ph-xxx
-  python maimemo.py note-add --word button --type 其他 --text "联想..." [--publish]
-  python maimemo.py note-del --id nt-xxx --note-type 其他
+  python maimemo.py note-add --word button --type 其他 --text "联想..." [--publish]  python maimemo.py note-del --id nt-xxx --note-type 其他
   python maimemo.py image-note --word button --image E:\\path\\pic.png [--private-voc 57067b...]
   python maimemo.py whoami
 
 默认值来自 cfg/config.json（释义默认公开+简明；例句默认公开+小学+来源标签；
-tags 均支持多选，命令行传入覆盖配置）。
+文本助记默认私有+其他；tags 均支持多选，命令行传入覆盖配置）。
+token 缺失/过期时自动运行 open_token.py / web_token.py 续期，无需手动操作。
 """
 import argparse
 import gzip
@@ -28,6 +28,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import urllib.error
@@ -111,30 +112,47 @@ def load_config():
 
 def load_tokens():
     if not os.path.exists(TOKEN_FILE):
-        die(f"找不到 {TOKEN_FILE}。请先运行 open_token.py 与 web_token.py 获取凭证。")
+        return {}   # 首次运行：交由 _auto_renew 自动获取
     with open(TOKEN_FILE, encoding="utf-8") as f:
         return json.load(f)
+
+
+def _auto_renew(script, hint):
+    """token 缺失/过期时自动重取（需 cof.json 已配置账号）。AI/用户均无需手动操作。"""
+    path = os.path.join(HERE, script)
+    if not os.path.exists(path):
+        die(f"找不到 {path}，{hint}")
+    print(f"[i] 凭证缺失/过期，自动运行 {script} 续期…", file=sys.stderr)
+    r = subprocess.run([sys.executable, path], capture_output=True, text=True,
+                       timeout=180, cwd=CFG_DIR)
+    if r.returncode != 0:
+        msg = (r.stdout + r.stderr).strip()[-400:]
+        die(f"{script} 自动续期失败（检查 cof.json 账号密码是否正确）：\n{msg}")
 
 
 def open_token():
     t = load_tokens().get("open_token", {})
     tok = t.get("open_token")
-    if not tok:
-        die("token.json 中缺少 open_token。请运行 open_token.py。")
     exp = t.get("expire_ts")
-    if exp and time.time() > exp:
-        die(f"open_token 已过期（{t.get('expire')}）。请重新运行 open_token.py。")
+    if not tok or (exp and time.time() > exp):
+        _auto_renew("open_token.py", "或手动运行 scripts/open_token.py")
+        t = load_tokens().get("open_token", {})
+        tok = t.get("open_token")
+        if not tok:
+            die("自动续期后仍无 open_token，请检查 open_token.py 输出。")
     return tok
 
 
 def web_token():
     t = load_tokens().get("web_token", {})
     tok = t.get("web_token")
-    if not tok:
-        die("token.json 中缺少 web_token。请运行 web_token.py。")
     exp = t.get("expire_ts")
-    if exp and time.time() > exp:
-        die(f"web_token 已过期（{t.get('expire')}）。请重新运行 web_token.py。")
+    if not tok or (exp and time.time() > exp):
+        _auto_renew("web_token.py", "或手动运行 scripts/web_token.py")
+        t = load_tokens().get("web_token", {})
+        tok = t.get("web_token")
+        if not tok:
+            die("自动续期后仍无 web_token，请检查 web_token.py 输出。")
     return tok
 
 
@@ -356,8 +374,12 @@ def phrase_del(pid):
 
 # ────────────────────────── 助记（文本） ──────────────────────────
 
-def note_add(word, note_type, text, publish):
+def note_add(word, note_type, text, publish=None):
+    cfg = load_config().get("note", {})
     voc = get_voc_id(word)
+    note_type = note_type or cfg.get("type") or "其他"
+    if publish is None:
+        publish = cfg.get("public", False)   # 默认私有
     if note_type not in NOTE_TYPES_TEXT:
         die(f"文本助记 note_type 仅支持 {NOTE_TYPES_TEXT}（图例请用 image-note 命令）。")
     body = {"note": {"voc_id": voc, "note_type": note_type, "note": text, "publish": publish}}
@@ -568,11 +590,13 @@ def main():
     sp = sub.add_parser("phrase-del", help="删除例句")
     sp.add_argument("--id", required=True)
 
-    sp = sub.add_parser("note-add", help="创建文本助记")
+    sp = sub.add_parser("note-add", help="创建文本助记（默认私有，类型默认取配置，默认 其他）")
     sp.add_argument("--word", required=True)
-    sp.add_argument("--type", default="其他", choices=NOTE_TYPES_TEXT)
+    sp.add_argument("--type", default=None, choices=NOTE_TYPES_TEXT,
+                    help="默认取 config.json 的 note.type（其他）")
     sp.add_argument("--text", required=True)
-    sp.add_argument("--publish", action="store_true")
+    sp.add_argument("--publish", action="store_true",
+                    help="创建为公开；默认私有（也可用 config.json 的 note.public）")
 
     sp = sub.add_parser("note-del", help="删除助记")
     sp.add_argument("--id", required=True)
@@ -607,7 +631,8 @@ def main():
     elif args.cmd == "phrase-del":
         phrase_del(args.id)
     elif args.cmd == "note-add":
-        note_add(args.word, args.type, args.text, args.publish)
+        note_add(args.word, args.type, args.text,
+                 True if args.publish else None)
     elif args.cmd == "note-del":
         note_del(args.id, args.note_type, args.text)
     elif args.cmd == "image-note":

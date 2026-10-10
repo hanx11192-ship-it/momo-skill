@@ -7,5 +7,9 @@
     "tags": ["小学"],
     "origin": "github.com/hanx11192-ship-it/momo-skill 项目创建",
     "public": true
+  },
+  "note": {
+    "type": "其他",
+    "public": false
   }
 }
