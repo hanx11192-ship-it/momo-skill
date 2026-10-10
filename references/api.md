@@ -606,8 +606,8 @@ GET https://backup.maimemostatus.com/api/v1/vocabulary/search?spelling=sleep
 
 ```bash
 # 拿到后立刻登记进缓存，以后同词复用
-python scripts/maimemo.py set-voc --word sleep --voc 57067b78a172044907c607fa
-python scripts/maimemo.py voc-cache          # 查看已登记
+python scripts/momo.py set-voc --word sleep --voc 57067b78a172044907c607fa
+python scripts/momo.py voc-cache          # 查看已登记
 ```
 
 > 💡 缓存文件：`scripts/cfg/voc_private.json`（`{word: "24hex"}` 结构）
@@ -646,7 +646,7 @@ print(post("/phrases", {"phrase": {
 
 ### 9.2 写入图片助记（私有上传 + 私有建卡）
 
-见 `scripts/maimemo.py image-note`（可直接运行）。
+见 `scripts/momo.py image-note`（可直接运行）。
 
 ---
 

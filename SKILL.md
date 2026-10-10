@@ -1,5 +1,5 @@
 ---
-name: maimemo-vocab-writer
+name: momo-voca-recorder
 description: 墨墨记单词。用于把单词的释义、例句、助记（文字或图片）写入墨墨背单词 App。当用户提到"墨墨""墨墨背单词""记到墨墨""存到墨墨""加到墨墨""墨墨助记/释义/例句""墨墨记单词"，或要求解释单词后写入墨墨时，必须使用本技能。也适用于查询单词在墨墨中已有的释义/例句/助记。
 agent_created: true
 ---
@@ -17,7 +17,7 @@ agent_created: true
 执行步骤：
 
 1. **解释单词**：用通用知识给出释义 / 例句 / 助记建议，呈现给用户确认。
-2. **用户确认后写入**：调用 `scripts/maimemo.py` 写入墨墨。
+2. **用户确认后写入**：调用 `scripts/momo.py` 写入墨墨。
 3. **回读验证**：写入后执行 `list` 确认内容已正确保存。
 
 > 除非用户明确要求"直接写入"，否则**先解释、等确认、再写入**。
@@ -35,7 +35,7 @@ agent_created: true
 **写入前先检查凭证**：
 
 ```bash
-python scripts/maimemo.py whoami
+python scripts/momo.py whoami
 ```
 
 若提示 token 过期，指导用户重新运行对应获取脚本。
@@ -55,15 +55,15 @@ python scripts/maimemo.py whoami
 **查询词条**
 
 ```bash
-python scripts/maimemo.py vocab button
-python scripts/maimemo.py list button              # 列出释义/例句/助记
-python scripts/maimemo.py list button --type note  # 只看助记
+python scripts/momo.py vocab button
+python scripts/momo.py list button              # 列出释义/例句/助记
+python scripts/momo.py list button --type note  # 只看助记
 ```
 
 **写入释义**
 
 ```bash
-python scripts/maimemo.py interp-add --word button \
+python scripts/momo.py interp-add --word button \
   --text "n. 按钮；纽扣。v. 扣上."
 # 默认公开 + tags 取 config.json（默认 简明）；tags 可多选；--private 改私有
 ```
@@ -71,7 +71,7 @@ python scripts/maimemo.py interp-add --word button \
 **写入例句**
 
 ```bash
-python scripts/maimemo.py phrase-add --word button \
+python scripts/momo.py phrase-add --word button \
   --phrase "Click the button to confirm your choice." \
   --interp "点击按钮确认你的选择。"
 # 默认公开 + tags 取 config.json（默认 小学）+ 来源取 config.json 的 phrase.origin；
@@ -81,7 +81,7 @@ python scripts/maimemo.py phrase-add --word button \
 **写入文字助记**
 
 ```bash
-python scripts/maimemo.py note-add --word button \
+python scripts/momo.py note-add --word button \
   --type 其他 --text "联想：but（但是）+ ton（吨）→ 一吨按钮？其实是小小按钮。" \
   --publish
 ```
@@ -90,23 +90,23 @@ python scripts/maimemo.py note-add --word button \
 
 ```bash
 # 首次需先登记该词的私有 voc_id（见下方「图片助记前置条件」）
-python scripts/maimemo.py set-voc --word button --voc 57067b78a172044907c607fa
-python scripts/maimemo.py image-note --word button --image "图片路径.png"
+python scripts/momo.py set-voc --word button --voc 57067b78a172044907c607fa
+python scripts/momo.py image-note --word button --image "图片路径.png"
 ```
 
 **私有 voc_id 缓存管理**
 
 ```bash
-python scripts/maimemo.py set-voc --word sleep --voc <24hex>   # 登记
-python scripts/maimemo.py voc-cache                            # 查看全部
+python scripts/momo.py set-voc --word sleep --voc <24hex>   # 登记
+python scripts/momo.py voc-cache                            # 查看全部
 ```
 
 **删除**
 
 ```bash
-python scripts/maimemo.py interp-del --id intp-xxx
-python scripts/maimemo.py phrase-del --id ph-xxx
-python scripts/maimemo.py note-del --id nt-xxx --note-type 其他
+python scripts/momo.py interp-del --id intp-xxx
+python scripts/momo.py phrase-del --id ph-xxx
+python scripts/momo.py note-del --id nt-xxx --note-type 其他
 ```
 
 ## 关键约束（必须遵守）
@@ -166,7 +166,7 @@ skill 已内置 `references/voc_index.json.gz`（**128,683 个单词 → 私有 
 python scripts/voc_db.py button sleep    # 秒回
 ```
 
-`maimemo.py` 的 `image-note` 已自动集成：查缓存 → 查内置索引 → 建图例，
+`momo.py` 的 `image-note` 已自动集成：查缓存 → 查内置索引 → 建图例，
 全程无感。仅当索引查不到生僻词时，才降级走 adb 读手机实时库（需 root），
 或最后向用户索要抓包 24hex。
 
@@ -200,7 +200,7 @@ seed 无法复现，详见 `references/crypto.md` 第 7 节）。此途径当前
 写好图例前，先检查缓存：
 
 ```bash
-python scripts/maimemo.py voc-cache          # 看这个词是否已在缓存里
+python scripts/momo.py voc-cache          # 看这个词是否已在缓存里
 ```
 
 **若缓存里没有**，直接跑 `image-note` —— 它会自动经 adb 读 App 本地库反查
@@ -216,8 +216,8 @@ python scripts/maimemo.py voc-cache          # 看这个词是否已在缓存里
 用户给出 hex 后，先 `set-voc` 存进缓存，再跑 `image-note`：
 
 ```bash
-python scripts/maimemo.py set-voc --word <词> --voc <24hex>
-python scripts/maimemo.py image-note --word <词> --image "图片路径.png"
+python scripts/momo.py set-voc --word <词> --voc <24hex>
+python scripts/momo.py image-note --word <词> --image "图片路径.png"
 ```
 
 > 缓存文件 `scripts/cfg/voc_private.json`，结构 `{word: "24hex"}`。攒起来后同词复用，不必反复抓包。
@@ -230,21 +230,21 @@ python scripts/maimemo.py image-note --word <词> --image "图片路径.png"
 
 ```bash
 # 1. 确认词条存在
-python scripts/maimemo.py vocab button
+python scripts/momo.py vocab button
 
 # 2. 写入释义
-python scripts/maimemo.py interp-add --word button --text "n. 按钮；纽扣"
+python scripts/momo.py interp-add --word button --text "n. 按钮；纽扣"
 
 # 3. 写入例句
-python scripts/maimemo.py phrase-add --word button \
+python scripts/momo.py phrase-add --word button \
   --phrase "Click the button to start." --interp "点击按钮开始。"
 
 # 4. 写入助记
-python scripts/maimemo.py note-add --word button --type 谐音 \
+python scripts/momo.py note-add --word button --type 谐音 \
   --text "谐音'拔藤'：拔开藤蔓，露出按钮。" --publish
 
 # 5. 验证
-python scripts/maimemo.py list button
+python scripts/momo.py list button
 ```
 
 ### 场景 B：先解释，用户确认再写入
@@ -276,4 +276,4 @@ python scripts/maimemo.py list button
 ## 参考文档
 
 - 完整接口文档（请求头 / 请求体 / 响应体 / 全部踩坑）：`references/api.md`
-- 脚本源码：`scripts/maimemo.py`
+- 脚本源码：`scripts/momo.py`

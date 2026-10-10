@@ -16,6 +16,7 @@ AI：（自动写入 App ✓）
 - **全自动私有 voc_id 解析**：内置 129,927 词离线词库（`voc_index.json.gz` + `voc_wordlib.db`），查询 0.2 秒、零设备依赖；查不到的生僻词可自动降级经 adb(root) 从手机实时拉库。
 - **文字内容**：释义（多标签）、例句（多标签 + 来源标签）、谐音/其他助记，走开放 API。
 - **图片助记（图例）**：自动上传图片并创建 App 内私有图例（图例一律私有，仅自己可见），走 App 私有协议（本项目逆向实现的签名算法）。
+- **图片格式转换**：内置 `convert-image` 命令，webp / bmp / gif / tiff / avif 一键转 png/jpg；`image-note` 上传前也会自动转换，无需手动处理。
 - **凭证全自动**：`open_token.py`（24h 开放 API token）与 `web_token.py`（约 1 年私有域 token）读同一份 `cof.json`。**token 缺失或过期时，核心脚本会自动调用它们续期**——配置好账号后，无论是人还是 AI 驱动的 skill，都不需要任何手动维护。
 
 ## 目录结构
@@ -30,7 +31,7 @@ momo-voca-recorder/
 │   ├── voc_index.json.gz         # 128,683 词 → 私有 voc_id 离线索引
 │   └── voc_wordlib.db            # 129,927 词完整词表 SQLite（仅词表，无账号数据）
 └── scripts/
-    ├── maimemo.py                # 核心客户端（释义/例句/助记/图片上传）
+    ├── momo.py                # 核心客户端（释义/例句/助记/图片上传）
     ├── open_token.py             # 开放 API token 自动获取（OAuth2 流程复刻）
     ├── web_token.py              # 私有域 web_token 自动获取
     ├── voc_db.py                 # 私有 voc_id 四级查询（索引→内置库→缓存→adb）
@@ -91,16 +92,17 @@ python scripts/web_token.py      # 可手动执行；约 1 年有效
 ```
 
 - 两个脚本读取 `scripts/cfg/cof.json`，结果自动写入 `scripts/cfg/token.json`。
-- **通常不需要手动跑**：`maimemo.py` 检测到 token 缺失或过期时会自动调用这两个脚本续期。对 AI Agent 场景，skill 只管正常调用写入命令，续期在后台自动完成。
+- **通常不需要手动跑**：`momo.py` 检测到 token 缺失或过期时会自动调用这两个脚本续期。对 AI Agent 场景，skill 只管正常调用写入命令，续期在后台自动完成。
 - 默认凭证目录为 `scripts/cfg/`，可用环境变量 `MAIMEMO_CONFIG_DIR` 指向其他位置。
 
 ### 第 3 步：使用
 
 ```bash
-python scripts/maimemo.py interp-add --word button --text "n. 按钮"          # 释义，默认公开+简明
-python scripts/maimemo.py phrase-add --word button --phrase "Push the button." --interp "按下按钮"   # 例句，默认公开+小学+配置来源
-python scripts/maimemo.py note-add   --word button --text "不疼（button）"    # 文本助记，默认私有+其他
-python scripts/maimemo.py image-note --word button --image 图片路径.png       # 图片助记（图例，一律私有）
+python scripts/momo.py interp-add --word button --text "n. 按钮"          # 释义，默认公开+简明
+python scripts/momo.py phrase-add --word button --phrase "Push the button." --interp "按下按钮"   # 例句，默认公开+小学+配置来源
+python scripts/momo.py note-add   --word button --text "不疼（button）"    # 文本助记，默认私有+其他
+python scripts/momo.py image-note --word button --image 图片.webp             # 图片助记，webp 自动转 png
+python scripts/momo.py convert-image --src 截图.webp --fmt jpg                # 单独转换格式
 ```
 
 - tags 均支持多选：`--tags 简明 详细`、`--tags 小学 四级`。

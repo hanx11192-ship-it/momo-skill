@@ -405,6 +405,40 @@ def note_del(nid, note_type, text=""):
 
 # ────────────────────────── 图片助记 ──────────────────────────
 
+def convert_image(src, out=None, fmt="png"):
+    """把 webp/bmp/tiff/gif 等格式转为 png/jpg（App 只接受 PNG/JPG）。
+    返回转换后的文件路径；已是目标格式则原样返回。"""
+    ext = os.path.splitext(src)[1].lower()
+    if ext in (".png", ".jpg", ".jpeg") and (fmt == "png" or ext in (".jpg", ".jpeg")):
+        return src
+    try:
+        from PIL import Image
+    except ImportError:
+        die("需要 Pillow 库转换图片格式：pip install Pillow")
+    if not os.path.exists(src):
+        die(f"图片不存在：{src}")
+    out = out or os.path.splitext(src)[0] + (".png" if fmt == "png" else ".jpg")
+    img = Image.open(src)
+    if fmt == "jpg" or (fmt == "png" and img.mode in ("RGBA", "P", "LA")):
+        if img.mode in ("RGBA", "P", "LA") and fmt == "jpg":
+            img = img.convert("RGBA")
+            bg = Image.new("RGB", img.size, (255, 255, 255))
+            bg.paste(img, mask=img.split()[-1])
+            img = bg
+        else:
+            img = img.convert("RGB") if fmt == "png" else img
+    img.save(out, "PNG" if fmt == "png" else "JPEG", quality=92)
+    ok(f"已转换 {src} -> {out}")
+    return out
+
+
+def ensure_upload_format(path):
+    """上传前确保格式为 PNG/JPG；webp 等自动转 PNG（不覆盖原图，生成同名 .png）。"""
+    if os.path.splitext(path)[1].lower() in (".webp", ".bmp", ".tif", ".tiff", ".gif", ".avif"):
+        return convert_image(path, fmt="png")
+    return path
+
+
 def upload_image(path, filename=None):
     if not os.path.exists(path):
         die(f"图片不存在：{path}")
@@ -480,6 +514,8 @@ def try_resolve_priv_voc(word):
 
 
 def image_note(word, image_path, private_voc=None):
+    # 0) 格式保障：webp/bmp/gif 等自动转 PNG（App 只接受 PNG/JPG）
+    image_path = ensure_upload_format(image_path)
     # 1) 上传
     fid, finfo = upload_image(image_path)
     ok(f"图片已上传  file_id={fid}  {finfo.get('size')} bytes")
@@ -608,6 +644,12 @@ def main():
     sp.add_argument("--image", required=True)
     sp.add_argument("--private-voc", default=None)
 
+    sp = sub.add_parser("convert-image",
+                        help="图片格式转换（webp/bmp/gif/tiff/avif → png/jpg）")
+    sp.add_argument("--src", required=True)
+    sp.add_argument("--out", default=None, help="输出路径；默认同名换扩展名")
+    sp.add_argument("--fmt", default="png", choices=["png", "jpg"])
+
     sp = sub.add_parser("set-voc", help="登记私有 voc_id（24 位 hex）到缓存")
     sp.add_argument("--word", required=True)
     sp.add_argument("--voc", required=True)
@@ -637,6 +679,8 @@ def main():
         note_del(args.id, args.note_type, args.text)
     elif args.cmd == "image-note":
         image_note(args.word, args.image, args.private_voc)
+    elif args.cmd == "convert-image":
+        convert_image(args.src, args.out, args.fmt)
     elif args.cmd == "set-voc":
         put_priv_voc(args.word, args.voc.strip().lower())
     elif args.cmd == "voc-cache":
