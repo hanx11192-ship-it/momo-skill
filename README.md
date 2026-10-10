@@ -40,31 +40,66 @@ maimemo-vocab-writer/
 
 ## 快速开始
 
-1. **配置凭证**（只需一次）：
+### 第 1 步：配置墨墨账号（只需一次）
+
+```bash
+cd scripts/cfg
+cp cof.example.json cof.json
+cp config.example.json config.json
+```
+
+然后用任意文本编辑器打开 **`cof.json`**，填入你自己的墨墨账号：
+
+```json
+{
+  "account": "你的墨墨登录邮箱",
+  "password": "你的墨墨登录密码"
+}
+```
+
+> ⚠️ `cof.json` 含明文密码，请勿提交到 git / 分享给他人（本仓库默认不含此文件）。
+
+**`config.json`** 是内容默认偏好，可按需修改（不建也能用，走内置默认）：
+
+```json
+{
+  "interp": { "tags": ["简明"], "public": true },
+  "phrase": { "tags": ["小学"], "origin": "github.com/hanx11192-ship-it/momo-skill 项目创建", "public": true }
+}
+```
+
+| 键 | 含义 | 默认 |
+|---|---|---|
+| `interp.tags` | 释义标签（可多选数组） | `["简明"]` |
+| `interp.public` | 释义是否公开 | `true` |
+| `phrase.tags` | 例句标签（可多选数组，白名单见下） | `["小学"]` |
+| `phrase.origin` | 例句「来源」标签（App 内显示的自由文本） | `github.com/hanx11192-ship-it/momo-skill 项目创建` |
+| `phrase.public` | 例句是否公开 | `true` |
+
+标签白名单：考纲类 `考研 四级 六级 雅思 托福 GRE 专四 专八`；学段类（例句）`小学 初中 高中`；释义风格 `简明 详细`。
+
+### 第 2 步：获取 token（自动，过期重跑即可）
+
+```bash
+python scripts/open_token.py     # 开放 API token，24h 有效
+python scripts/web_token.py      # 私有域 token，约 1 年有效
+```
+
+两个脚本读取 `scripts/cfg/cof.json`，结果自动写入 `scripts/cfg/token.json`。
+> 默认凭证目录为 `scripts/cfg/`，可用环境变量 `MAIMEMO_CONFIG_DIR` 指向其他位置。
+
+### 第 3 步：使用
 
    ```bash
-   cd scripts/cfg
-   cp cof.example.json cof.json
-   # 编辑 cof.json，填入你的墨墨账号（邮箱）和密码
-   ```
-
-2. **获取 token**（自动写入 `scripts/cfg/token.json`）：
-
-   ```bash
-   python scripts/open_token.py     # 开放 API token，24h 有效，可随时重跑续期
-   python scripts/web_token.py      # 私有域 token，约 1 年有效
-   ```
-
-   > 默认凭证目录为 `scripts/cfg/`，可用环境变量 `MAIMEMO_CONFIG_DIR` 指向其他位置。
-
-3. **使用**：在 WorkBuddy 里说「帮我解释 XX 这个词，OK 的话加到墨墨里」即可；也可直接命令行：
-
-   ```bash
-   python scripts/maimemo.py define --word button --text "n. 按钮" --tags 简明
+   python scripts/maimemo.py define --word button --text "n. 按钮"
    python scripts/maimemo.py phrase  --word button --phrase "Push the button." --interp "按下按钮"
    python scripts/maimemo.py note    --word button --type 谐音 --text "不疼（button）"
    python scripts/maimemo.py image-note --word button --image 图片路径.png
    ```
+
+   > 释义/例句默认**公开**，tags 支持多选（`--tags 简明 详细`），不传参时取 `config.json` 默认值；
+   > 加 `--private` 可创建私有（UNPUBLISHED）。**图片助记（图例）一律为私有**——
+   > 这是墨墨图例的默认形态，上传后仅你自己可见。
 
 ## 技术细节（为什么能全自动）
 

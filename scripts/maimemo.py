@@ -9,15 +9,18 @@
 用法：
   python maimemo.py vocab button
   python maimemo.py list button [--type all|interp|phrase|note]
-  python maimemo.py interp-add --word button --text "n. 按钮" [--tags 考研] [--public]
+  python maimemo.py interp-add --word button --text "n. 按钮" [--tags 简明 详细] [--private]
   python maimemo.py interp-del --id intp-xxx
   python maimemo.py phrase-add --word button --phrase "Click the button." --interp "点击按钮。" \
-                               [--tags 小学] [--origin "大肥鱼创建"] [--public]
+                               [--tags 小学 四级 ...] [--origin "..."] [--private]
   python maimemo.py phrase-del --id ph-xxx
   python maimemo.py note-add --word button --type 其他 --text "联想..." [--publish]
   python maimemo.py note-del --id nt-xxx --note-type 其他
   python maimemo.py image-note --word button --image E:\\path\\pic.png [--private-voc 57067b...]
   python maimemo.py whoami
+
+默认值来自 cfg/config.json（释义默认公开+简明；例句默认公开+小学+来源标签；
+tags 均支持多选，命令行传入覆盖配置）。
 """
 import argparse
 import gzip
@@ -38,6 +41,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 CFG_DIR = os.environ.get("MAIMEMO_CONFIG_DIR", os.path.join(_HERE, "cfg"))
 TOKEN_FILE = os.path.join(CFG_DIR, "token.json")
 COF_FILE = os.path.join(CFG_DIR, "cof.json")
+CONFIG_FILE = os.path.join(CFG_DIR, "config.json")
 
 OPEN_BASE = "https://open.maimemo.com/open/api/v1/memo"
 PRIV_HOST = "https://backup.maimemostatus.com"
@@ -87,6 +91,15 @@ def die(msg, code=1):
 
 def ok(msg):
     print("✅ " + msg)
+
+
+def load_config():
+    """读取 cfg/config.json（用户默认偏好）。缺失时返回 {}。"""
+    try:
+        with open(CONFIG_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
 
 
 def load_tokens():
@@ -275,12 +288,14 @@ def put_priv_voc(word, hexid):
 
 # ────────────────────────── 释义 ──────────────────────────
 
-def interp_add(word, text, tags, public):
+def interp_add(word, text, tags, private=False):
+    cfg = load_config().get("interp", {})
     voc = get_voc_id(word)
-    tags = tags or ["考研"]
+    tags = tags or cfg.get("tags") or ["简明"]
     bad = [t for t in tags if t not in TAGS_INTERP]
     if bad:
         print(f"⚠️  标签 {bad} 不在实测白名单内，可能被拒。可用：{TAGS_INTERP}")
+    public = (not private) and cfg.get("public", True)
     body = {"interpretation": {
         "voc_id": voc, "interpretation": text, "tags": tags,
         "status": "PUBLISHED" if public else "UNPUBLISHED"}}
@@ -302,17 +317,20 @@ def interp_del(iid):
 
 # ────────────────────────── 例句 ──────────────────────────
 
-def phrase_add(word, phrase, interp, tags, origin, public):
+def phrase_add(word, phrase, interp, tags, origin, private=False):
+    cfg = load_config().get("phrase", {})
     voc = get_voc_id(word)
-    tags = tags or ["考研"]
+    tags = tags or cfg.get("tags") or ["小学"]
     bad = [t for t in tags if t not in TAGS_PHRASE]
     if bad:
         print(f"⚠️  标签 {bad} 不在实测白名单内，可能被拒。可用：{TAGS_PHRASE}")
     if len(phrase.split()) < 2:
         die("例句必须至少包含 2 个单词（phrase_single_voc 限制）。")
+    public = (not private) and cfg.get("public", True)
     body = {"phrase": {
         "voc_id": voc, "phrase": phrase, "interpretation": interp,
-        "tags": tags, "origin": origin or ""}}
+        "tags": tags, "origin": origin or cfg.get("origin",
+            "github.com/hanx11192-ship-it/momo-skill 项目创建")}}
     st, j = open_api("POST", "/phrases", body)
     if st in (200, 201):
         nid = j.get("data", {}).get("phrase", {}).get("id")
@@ -518,22 +536,27 @@ def main():
     sp.add_argument("word")
     sp.add_argument("--type", default="all", choices=["all", "interp", "phrase", "note"])
 
-    sp = sub.add_parser("interp-add", help="创建释义")
+    sp = sub.add_parser("interp-add", help="创建释义（默认公开，tags 默认取配置，可多选）")
     sp.add_argument("--word", required=True)
     sp.add_argument("--text", required=True)
-    sp.add_argument("--tags", nargs="*", default=["考研"])
-    sp.add_argument("--public", action="store_true")
+    sp.add_argument("--tags", nargs="*", default=None,
+                    help="可多选，如 --tags 简明 详细；默认取 config.json 的 interp.tags（简明）")
+    sp.add_argument("--private", action="store_true",
+                    help="创建为私有（UNPUBLISHED）；默认公开 PUBLISHED")
 
     sp = sub.add_parser("interp-del", help="删除释义")
     sp.add_argument("--id", required=True)
 
-    sp = sub.add_parser("phrase-add", help="创建例句")
+    sp = sub.add_parser("phrase-add", help="创建例句（默认公开，tags/来源默认取配置，tags 可多选）")
     sp.add_argument("--word", required=True)
     sp.add_argument("--phrase", required=True)
     sp.add_argument("--interp", required=True)
-    sp.add_argument("--tags", nargs="*", default=["考研"])
-    sp.add_argument("--origin", default="")
-    sp.add_argument("--public", action="store_true")
+    sp.add_argument("--tags", nargs="*", default=None,
+                    help="可多选，如 --tags 小学 四级；默认取 config.json 的 phrase.tags（小学）")
+    sp.add_argument("--origin", default=None,
+                    help="来源标签；默认取 config.json 的 phrase.origin")
+    sp.add_argument("--private", action="store_true",
+                    help="创建为私有（UNPUBLISHED）；默认公开 PUBLISHED")
 
     sp = sub.add_parser("phrase-del", help="删除例句")
     sp.add_argument("--id", required=True)
@@ -569,11 +592,11 @@ def main():
     elif args.cmd == "list":
         cmd_list(args.word, args.type)
     elif args.cmd == "interp-add":
-        interp_add(args.word, args.text, args.tags, args.public)
+        interp_add(args.word, args.text, args.tags, args.private)
     elif args.cmd == "interp-del":
         interp_del(args.id)
     elif args.cmd == "phrase-add":
-        phrase_add(args.word, args.phrase, args.interp, args.tags, args.origin, args.public)
+        phrase_add(args.word, args.phrase, args.interp, args.tags, args.origin, args.private)
     elif args.cmd == "phrase-del":
         phrase_del(args.id)
     elif args.cmd == "note-add":

@@ -29,7 +29,8 @@ agent_created: true
 | 文件 | 内容 | 获取方式 |
 |---|---|---|
 | `token.json` | `open_token`（24h）+ `web_token`（约1年） | 运行 `open_token.py` / `web_token.py` |
-| `cof.json` | 账号密码 | 用户提供 |
+| `cof.json` | 账号密码 | 用户提供（复制 `cof.example.json` 改） |
+| `config.json` | 内容默认偏好：释义/例句的 tags、来源、公开性 | 可选（复制 `config.example.json`，不建走内置默认） |
 
 **写入前先检查凭证**：
 
@@ -63,7 +64,8 @@ python scripts/maimemo.py list button --type note  # 只看助记
 
 ```bash
 python scripts/maimemo.py interp-add --word button \
-  --text "n. 按钮；纽扣。v. 扣上." --tags 考研 --public
+  --text "n. 按钮；纽扣。v. 扣上."
+# 默认公开 + tags 取 config.json（默认 简明）；tags 可多选；--private 改私有
 ```
 
 **写入例句**
@@ -71,8 +73,9 @@ python scripts/maimemo.py interp-add --word button \
 ```bash
 python scripts/maimemo.py phrase-add --word button \
   --phrase "Click the button to confirm your choice." \
-  --interp "点击按钮确认你的选择。" \
-  --tags 小学 --origin "大肥鱼创建" --public
+  --interp "点击按钮确认你的选择。"
+# 默认公开 + tags 取 config.json（默认 小学）+ 来源取 config.json 的 phrase.origin；
+# tags 可多选（--tags 小学 四级），--private 改私有
 ```
 
 **写入文字助记**
@@ -230,11 +233,11 @@ python scripts/maimemo.py image-note --word <词> --image "图片路径.png"
 python scripts/maimemo.py vocab button
 
 # 2. 写入释义
-python scripts/maimemo.py interp-add --word button --text "n. 按钮；纽扣" --tags 简明 --public
+python scripts/maimemo.py interp-add --word button --text "n. 按钮；纽扣"
 
 # 3. 写入例句
 python scripts/maimemo.py phrase-add --word button \
-  --phrase "Click the button to start." --interp "点击按钮开始。" --tags 小学 --public
+  --phrase "Click the button to start." --interp "点击按钮开始。"
 
 # 4. 写入助记
 python scripts/maimemo.py note-add --word button --type 谐音 \
