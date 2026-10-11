@@ -17,6 +17,7 @@ AI：（自动写入 App ✓）
 - **文字内容**：释义（多标签）、例句（多标签 + 来源标签）、谐音/其他助记，走开放 API。
 - **图片助记（图例）**：自动上传图片并创建 App 内私有图例（图例一律私有，仅自己可见），走 App 私有协议（本项目逆向实现的签名算法）。
 - **图片格式转换**：内置 `convert-image` 命令，webp / bmp / gif / tiff / avif 一键转 png/jpg；`image-note` 上传前也会自动转换，无需手动处理。
+- **学习计划**：`study-add` 把单词加入学习计划（可一并提前复习），自动批量查词，单次≤1000 词；走官方公测接口 `study/add_words`。
 - **凭证全自动**：`open_token.py`（24h 开放 API token）与 `web_token.py`（约 1 年私有域 token）读同一份 `cof.json`。**token 缺失或过期时，核心脚本会自动调用它们续期**——配置好账号后，无论是人还是 AI 驱动的 skill，都不需要任何手动维护。
 
 ## 目录结构
@@ -102,6 +103,7 @@ python scripts/momo.py interp-add --word button --text "n. 按钮"          # �
 python scripts/momo.py phrase-add --word button --phrase "Push the button." --interp "按下按钮"   # 例句，默认公开+小学+配置来源
 python scripts/momo.py note-add   --word button --text "不疼（button）"    # 文本助记，默认私有+其他
 python scripts/momo.py image-note --word button --image 图片.webp             # 图片助记，webp 自动转 png
+python scripts/momo.py study-add --word button --advance                      # 加入学习计划并提前到当下复习
 python scripts/momo.py convert-image --src 截图.webp --fmt jpg                # 单独转换格式
 ```
 

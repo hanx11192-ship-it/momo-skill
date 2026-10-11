@@ -612,6 +612,72 @@ def image_note(word, image_path, private_voc=None, replace=None):
         die(f"创建失败 HTTP {st}：{raw.decode('utf-8', 'replace')[:300]}")
 
 
+
+# ────────────────────────── 学习计划 ──────────────────────────
+
+STUDY_LIMIT = 1000   # 单次请求单词数上限（官方 schema）
+
+
+def study_add(words, advance=False):
+    """把单词加入学习计划（study/add_words，公测）。
+    words: list[str] —— 自动逐个查开放 voc_id 后批量提交。"""
+    if not words:
+        die("未提供单词。")
+    pairs, missing = [], []
+    for w in dict.fromkeys(words):
+        try:
+            pairs.append((w, get_voc_id(w)))
+        except SystemExit:
+            missing.append(w)
+    if missing:
+        print(f"⚠️ 以下词在词库中查不到，已跳过：{missing}")
+    if not pairs:
+        die("没有可添加的单词。")
+    added_total = 0
+    for i in range(0, len(pairs), STUDY_LIMIT):
+        chunk = pairs[i:i + STUDY_LIMIT]
+        st, j = open_api("POST", "/study/add_words",
+                         {"words": [{"id": v} for _, v in chunk], "advance": advance})
+        if st in (200, 201) and isinstance(j, dict):
+            n = j.get("data", {}).get("added_count", 0)
+            added_total += n
+            ok(f"批量 {i+1}-{i+len(chunk)}：成功加入学习计划 {n}/{len(chunk)}")
+        else:
+            die(f"add_words 失败 HTTP {st}：{json.dumps(j, ensure_ascii=False)[:300]}")
+    print(f"✅ 共加入学习计划 {added_total}/{len(pairs)} 个单词"
+          f"{'（含提前复习）' if advance else ''}")
+    print("   注：需在 App 中开启「自动同步」；公测接口，服务端可能调整。")
+
+
+def study_advance(words):
+    """把已加入学习计划的单词提前到当下马上复习（study/advance_study，公测）。
+    注意：官方要求账号升级到 10 级解锁提前复习功能。"""
+    if not words:
+        die("未提供单词。")
+    ids, missing = [], []
+    for w in dict.fromkeys(words):
+        try:
+            ids.append(get_voc_id(w))
+        except SystemExit:
+            missing.append(w)
+    if missing:
+        print(f"⚠️ 以下词在词库中查不到，已跳过：{missing}")
+    if not ids:
+        die("没有可提前的单词。")
+    advanced_total = 0
+    for i in range(0, len(ids), STUDY_LIMIT):
+        chunk = ids[i:i + STUDY_LIMIT]
+        st, j = open_api("POST", "/study/advance_study", {"voc_ids": chunk})
+        if st in (200, 201) and isinstance(j, dict):
+            n = j.get("data", {}).get("advanced_count", 0)
+            advanced_total += n
+            ok(f"批量 {i+1}-{i+len(chunk)}：成功提前 {n}/{len(chunk)}")
+        else:
+            die(f"advance_study 失败 HTTP {st}：{json.dumps(j, ensure_ascii=False)[:300]}")
+    print(f"✅ 共提前复习 {advanced_total}/{len(ids)} 个单词"
+          f"（账号需 10 级解锁该功能；未加入学习计划的词不会计入）")
+
+
 # ────────────────────────── 查询 ──────────────────────────
 
 def cmd_list(word, which):
@@ -729,6 +795,16 @@ def main():
     sp.add_argument("--word", required=True)
     sp.add_argument("--voc", required=True)
 
+    sp = sub.add_parser("study-add",
+                        help="把单词加入学习计划（公测 study/add_words，批量≤1000）")
+    sp.add_argument("--words", nargs="+", required=True, help="一个或多个单词")
+    sp.add_argument("--advance", action="store_true",
+                    help="一并提前到当下马上复习（需 App 内可用）")
+
+    sp = sub.add_parser("study-advance",
+                        help="把已加入学习计划的单词提前到当下马上复习（公测）")
+    sp.add_argument("--words", nargs="+", required=True, help="一个或多个单词")
+
     sp = sub.add_parser("voc-cache", help="查看已缓存的私有 voc_id")
 
     args = p.parse_args()
@@ -758,6 +834,10 @@ def main():
         convert_image(args.src, args.out, args.fmt)
     elif args.cmd == "set-voc":
         put_priv_voc(args.word, args.voc.strip().lower())
+    elif args.cmd == "study-add":
+        study_add(args.words, args.advance)
+    elif args.cmd == "study-advance":
+        study_advance(args.words)
     elif args.cmd == "voc-cache":
         c = load_priv_voc_cache()
         if not c:

@@ -85,7 +85,20 @@ python scripts/momo.py phrase-add --word button \
 # tags 可多选（--tags 小学 四级），--private 改私有
 ```
 
-**写入文字助记**
+**把单词加入学习计划（今天就能复习）**
+
+```bash
+python scripts/momo.py study-add --words button              # 加入学习计划
+python scripts/momo.py study-add --words button --advance    # 加入并提前到当下马上复习
+python scripts/momo.py study-advance --words button          # 单独提前复习
+```
+
+> 用户对解释满意并说「加到学习计划」「今天就要复习」时用。study-add 自动批量查词
+> （单次≤1000 词），返回 added_count 才算成功。需用户 App 内开启「自动同步」；
+> advance 类接口要求账号 10 级解锁提前复习。这是**改用户学习计划的真实写操作**，
+> 执行前向用户复述要加入的词即可，无需逐词确认。
+
+**写入文字助记****写入文字助记**
 
 ```bash
 python scripts/momo.py note-add --word button \

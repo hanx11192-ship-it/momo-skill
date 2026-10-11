@@ -816,3 +816,24 @@ def make_signature(token, body, query):
 | 2026-10-10 | 8.3 节重写：明确私有 voc_id 无法从开放 voc_id 推导，唯一途径是 App 抓包；新增 `set-voc` / `voc-cache` 缓存管理 |
 | 2026-10-10 | 8.3 新增「途径 A：`/api/v1/vocabulary/search` 按拼写反查」；附 `MEMO_AES_V3` 密钥派生逆向结论（见 `references/crypto.md`） |
 
+
+
+## 附录 D：学习计划接口（公测）
+
+### D.1 加入学习计划
+```
+POST https://open.maimemo.com/open/api/v1/memo/study/add_words
+Authorization: Bearer <open_token>
+body: {"words": [{"id": "<开放 voc_id>"}], "advance": false}   # 单次≤1000
+→ 200 {"data": {"added_count": N}}    # 单词上限不足或已添加过会影响 N
+```
+
+### D.2 提前复习
+```
+POST /api/v1/memo/study/advance_study
+body: {"voc_ids": ["<开放 voc_id>", ...]}   # ≤1000
+→ 200 {"data": {"advanced_count": N}}   # 未加入学习计划的词不计入；账号需 10 级
+```
+
+> 公测接口不保证可用性，需在 App 内开启「自动同步」。
+> skill 内对应命令：`study-add --words ... [--advance]` / `study-advance --words ...`。
