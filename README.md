@@ -13,7 +13,7 @@ AI：（自动写入 App ✓）
 
 ## 特性
 
-- **全自动私有 voc_id 解析**：内置 129,927 词离线词库（`voc_index.json.gz` + `voc_wordlib.db`），查询 0.2 秒、零设备依赖；查不到的生僻词可自动降级经 adb(root) 从手机实时拉库。
+- **全自动私有 voc_id 解析**：内置 128,683 词离线索引（`voc_index.json.gz`，覆盖 App 词表全部唯一拼写），查询 0.2 秒、零设备依赖；查不到的生僻词可自动降级经 adb(root) 从手机实时拉库。
 - **文字内容**：释义（多标签）、例句（多标签 + 来源标签）、谐音/其他助记，走开放 API。
 - **图片助记（图例）**：自动上传图片并创建 App 内私有图例（图例一律私有，仅自己可见），走 App 私有协议（本项目逆向实现的签名算法）。
 - **图片格式转换**：内置 `convert-image` 命令，webp / bmp / gif / tiff / avif 一键转 png/jpg；`image-note` 上传前也会自动转换，无需手动处理。
@@ -115,7 +115,7 @@ python scripts/momo.py convert-image --src 截图.webp --fmt jpg                
 
 ## 技术细节（为什么能全自动）
 
-- **私有 voc_id**：开放 API 的 `voc-...` ID 与 App 私有协议的 24hex `voc_id` 不通用且无法推导。本 skill 内置了从 App 本地数据库（`momo.v425.db` 的 `VOC_TB`，129,927 词）导出的映射，离线即可反查。
+- **私有 voc_id**：开放 API 的 `voc-...` ID 与 App 私有协议的 24hex `voc_id` 不通用且无法推导。本 skill 内置了从 App 本地数据库（`momo.v425.db` 的 `VOC_TB`）导出的映射（128,683 个唯一拼写），离线即可反查。
 - **App 私有协议签名**：`Signature = SHA1hex(token + salt + p2(body) + p2(query) + TABLE32)`，`salt = SHA1hex(yyyyMMddHHmmss GMT+8)`，全部本地计算，详见 `references/crypto.md`。
 - **图例助记必须走私有域**：开放 API 建图例会 201 成功但图片挂不上（私有 file_id 无法关联），这是踩过两次的坑，skill 已内置正确路由。
 

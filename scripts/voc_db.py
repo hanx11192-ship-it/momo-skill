@@ -2,15 +2,12 @@
 """
 voc_db.py —— 查询墨墨私有 voc_id（24 位 hex，Mongo ObjectId）。
 
-三级来源，自动降级：
-  1. references/voc_index.json.gz —— 内置离线索引（128,683 词，来自
-     App 本地库 momo.v425.db 的 VOC_TB 全量导出，2026-10-10）。
-  2. references/voc_wordlib.db —— 内置完整词库 SQLite（129,927 词，
-     仅含 VOC_TB 词表，无任何账号数据），覆盖索引之外的生僻词。
-     ★ 以上均为离线，无需手机。
-  3. 本地缓存库 .cache/momo.v425.db —— 之前经 adb 拉取过的完整库。
-  4. adb(root) 实时拉取 —— 手机 USB 连接且已 root 时，可 `--pull` 刷新
-     （墨墨 App 词库会随版本更新，以上过旧或查不到生僻词时用）。
+两级来源，自动降级：
+  1. references/voc_index.json.gz —— 内置离线索引（128,683 词，覆盖
+     App 本地库 VOC_TB 全部唯一拼写），查询 0.2s，无需手机。★ 默认路径。
+  2. 本地缓存库 .cache/momo.v425.db —— 之前经 adb 拉取过的完整库
+     （App 词库更新后索引查不到的生僻词走这里）。
+  3. adb(root) 实时拉取 —— 手机 USB 连接且已 root 时，可 `--pull` 刷新。
 
 用法：
     python voc_db.py button sleep        # 查词（自动走 1→2）
@@ -28,7 +25,6 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.dirname(HERE)
 INDEX = os.path.join(SKILL, "references", "voc_index.json.gz")
-DB_BUNDLED = os.path.join(SKILL, "references", "voc_wordlib.db")
 CACHE = os.path.join(HERE, ".cache")
 DB_LOCAL = os.path.join(CACHE, "momo.v425.db")
 
@@ -105,16 +101,7 @@ def lookup(words, db_path=None, allow_pull=True):
         else:
             rest.append(w)
 
-    # 2) 内置完整词库（覆盖索引外的生僻词）
-    if rest and os.path.exists(DB_BUNDLED):
-        try:
-            got = _lookup_db(rest, DB_BUNDLED)
-            out.update(got)
-            rest = [w for w in rest if w not in got]
-        except Exception:
-            pass
-
-    # 3) 本地缓存库（adb 拉取过的最新 App 词库）
+    # 2) 本地缓存库（adb 拉取过的最新 App 词库）
     if rest and (db_path or os.path.exists(DB_LOCAL)):
         try:
             got = _lookup_db(rest, db_path or DB_LOCAL)
