@@ -13,7 +13,7 @@ AI：（自动写入 App ✓）
 
 ## 特性
 
-- **全自动私有 voc_id 解析**：内置 128,683 词离线索引（`voc_index.json.gz`，覆盖 App 词表全部唯一拼写），查询 0.2 秒、零设备依赖；查不到的生僻词可自动降级经 adb(root) 从手机实时拉库。
+- **全自动私有 voc_id 解析**：内置 128,683 词离线索引（`voc_index.tsv`，覆盖 App 词表全部唯一拼写），查询 0.2 秒、零设备依赖；查不到的生僻词可自动降级经 adb(root) 从手机实时拉库。
 - **文字内容**：释义（多标签）、例句（多标签 + 来源标签）、谐音/其他助记，走开放 API。
 - **图片助记（图例）**：自动上传图片并创建 App 内私有图例（图例一律私有，仅自己可见），走 App 私有协议（本项目逆向实现的签名算法）。
 - **图片格式转换**：内置 `convert-image` 命令，webp / bmp / gif / tiff / avif 一键转 png/jpg；`image-note` 上传前也会自动转换，无需手动处理。
@@ -29,16 +29,13 @@ momo-voca-recorder/
 ├── references/
 │   ├── api.md                    # 接口参考（开放 API + App 私有协议）
 │   ├── crypto.md                 # 签名/加密算法逆向笔记
-│   ├── voc_index.json.gz         # 128,683 词 → 私有 voc_id 离线索引
+│   ├── voc_index.tsv         # 128,683 词 → 私有 voc_id 离线索引
 │   └── voc_wordlib.db            # 129,927 词完整词表 SQLite（仅词表，无账号数据）
 └── scripts/
     ├── momo.py                # 核心客户端（释义/例句/助记/图片上传）
     ├── open_token.py             # 开放 API token 自动获取（OAuth2 流程复刻）
     ├── web_token.py              # 私有域 web_token 自动获取
     ├── voc_db.py                 # 私有 voc_id 四级查询（索引→内置库→缓存→adb）
-    ├── memo_crypto.py            # 加密算法研究（native 仿真 + 纯 Python e()）
-    ├── elf.py                    # ELF/JNI 表解析工具
-    ├── libmomoco.so              # App native 库（仿真宿主用）
     └── cfg/                      # 凭证与配置目录（各 *.example.json 为模板）
 ```
 

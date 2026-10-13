@@ -178,7 +178,7 @@ python scripts/momo.py note-del --id nt-xxx --note-type 其他
 
 **途径 A（✅ 已打通，首选）：内置离线索引，零设备依赖**
 
-skill 已内置 `references/voc_index.json.gz`（**128,683 个单词 → 私有 voc_id**，
+skill 已内置 `references/voc_index.tsv`（**128,683 个单词 → 私有 voc_id**，
 2026-10-10 从 App 本地库全量导出）。查询纯本地、约 0.2 秒，**不需要手机**。
 真机校验：`button -> 57067b78a172044907c607fa`（与抓包值一致）。
 

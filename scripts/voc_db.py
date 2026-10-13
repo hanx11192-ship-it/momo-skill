@@ -3,7 +3,7 @@
 voc_db.py —— 查询墨墨私有 voc_id（24 位 hex，Mongo ObjectId）。
 
 两级来源，自动降级：
-  1. references/voc_index.json.gz —— 内置离线索引（128,683 词，覆盖
+  1. references/voc_index.tsv —— 内置离线索引（128,683 词，覆盖
      App 本地库 VOC_TB 全部唯一拼写），查询 0.2s，无需手机。★ 默认路径。
   2. 本地缓存库 .cache/momo.v425.db —— 之前经 adb 拉取过的完整库
      （App 词库更新后索引查不到的生僻词走这里）。
@@ -24,7 +24,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.dirname(HERE)
-INDEX = os.path.join(SKILL, "references", "voc_index.json.gz")
+INDEX = os.path.join(SKILL, "references", "voc_index.tsv")
 CACHE = os.path.join(HERE, ".cache")
 DB_LOCAL = os.path.join(CACHE, "momo.v425.db")
 
@@ -37,10 +37,18 @@ _index = None
 
 
 def _load_index():
+    """加载 TSV 索引（word TAB id，# 开头为注释行）。首次调用后缓存。"""
     global _index
     if _index is None:
-        with gzip.open(INDEX, "rt", encoding="utf-8") as f:
-            _index = json.load(f)
+        idx = {}
+        with open(INDEX, encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("#") or "\t" not in line:
+                    continue
+                w, _, v = line.rstrip("\n").partition("\t")
+                if w and v:
+                    idx[w] = [v]
+        _index = idx
     return _index
 
 
