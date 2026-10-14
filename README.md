@@ -1,6 +1,6 @@
 # momo-voca-recorder
 
-一个 AI skill + 命令行工具：让 AI 解释单词，你确认后把**释义 / 例句 / 助记（文字或图片）**一键写入 momo（背单词 App），供随时复习。
+一个 AI skill + 命令行工具：让 AI 解释单词，你确认后把**释义 / 例句 / 助记（文字或图片）**一键写入 momo（背单词 App），支持加入到学习计划/提前复习。
 
 **不绑定特定平台**——既可作为 WorkBuddy / Claude 等 AI Agent 的 skill 使用，也可以直接当纯命令行工具用，任何能跑 Python 的地方都行。
 
